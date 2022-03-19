@@ -8,6 +8,15 @@
   :serial t
   :pathname "src/"
   :depends-on (:uiop
-               :cl-dbi)
+               :cl-dbi
+               :tiny-routes
+               :clack
+               :jonathan)
   :components ((:file "db")
+               (:module "controller"
+                :serial t
+                :components ((:file "space")))
+               (:file "middleware")
+               (:file "route")
+               (:file "server")
                (:file "cl-natter")))
