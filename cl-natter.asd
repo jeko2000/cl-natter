@@ -11,7 +11,8 @@
                :cl-dbi
                :tiny-routes
                :clack
-               :jonathan)
+               :jonathan
+               :cl-ppcre)
   :components ((:file "db")
                (:module "controller"
                 :serial t

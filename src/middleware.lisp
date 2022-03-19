@@ -2,10 +2,13 @@
 (in-package :cl-user)
 (uiop:define-package :cl-natter.middleware
   (:use :cl)
+  (:local-nicknames (:error :cl-natter.error)
+                    (:util :cl-natter.util))
   (:import-from :tiny-routes)
   (:export #:wrap-request-body
            #:wrap-request-json-body
-           #:wrap-response-json-body))
+           #:wrap-response-json-body
+           #:wrap-condition))
 
 (in-package :cl-natter.middleware)
 
@@ -35,3 +38,12 @@
      (tiny:pipe response
        (tiny:header-response :content-type "application/json")
        (tiny:body-mapper-response #'jojo:to-json)))))
+
+
+(defun wrap-condition (handler)
+  (lambda (request)
+    (handler-case (funcall handler request)
+      (jojo:<jonathan-error> ()
+        (tiny:bad-request (util:error-response "Unparsable JSON")))
+      (error:natter-validation-error (e)
+        (tiny:bad-request (util:error-response (format nil "~a" e)))))))
