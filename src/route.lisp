@@ -26,16 +26,18 @@
         (when (> (length space-name) 255)
           (error:natter-validation-error "space name too long"))
         (unless (ppcre:scan *owner-scanner* owner)
-          (error:natter-validation-error "invalid username ~a" owner))
+          (error:natter-validation-error "invalid username"))
         (let* ((space-id (space:create-space space-name owner))
                (uri (format nil "/spaces/~a" space-id)))
           (tiny:created uri (list :|name| space-name :|uri| uri)))))))
 
 (define-routes api-routes
   (pipe space-routes
-    (middleware:wrap-condition)
     (middleware:wrap-request-json-body)
-    (middleware:wrap-response-json-body))
+    (middleware:wrap-require-json-content-type)
+    (middleware:wrap-condition)
+    (middleware:wrap-response-json-body)
+    (middleware:wrap-sane-headers))
 
   ;; catch all route
   (define-route ()

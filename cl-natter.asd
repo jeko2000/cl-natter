@@ -12,8 +12,11 @@
                :tiny-routes
                :clack
                :jonathan
-               :cl-ppcre)
-  :components ((:file "db")
+               :cl-ppcre
+               :str)
+  :components ((:file "error")
+               (:file "util")
+               (:file "db")
                (:module "controller"
                 :serial t
                 :components ((:file "space")))

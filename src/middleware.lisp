@@ -8,7 +8,9 @@
   (:export #:wrap-request-body
            #:wrap-request-json-body
            #:wrap-response-json-body
-           #:wrap-condition))
+           #:wrap-condition
+           #:wrap-sane-headers
+           #:wrap-require-json-content-type))
 
 (in-package :cl-natter.middleware)
 
@@ -36,7 +38,7 @@
    handler
    (lambda (response)
      (tiny:pipe response
-       (tiny:header-response :content-type "application/json")
+       (tiny:header-response :content-type "application/json;charset=utf-8")
        (tiny:body-mapper-response #'jojo:to-json)))))
 
 
@@ -47,3 +49,28 @@
         (tiny:bad-request (util:error-response "Unparsable JSON")))
       (error:natter-validation-error (e)
         (tiny:bad-request (util:error-response (format nil "~a" e)))))))
+
+(defun wrap-sane-headers (handler)
+  (tiny:wrap-response-mapper
+   handler
+   (lambda (response)
+     (tiny:pipe response
+       (tiny:header-response :server "cl-natter")
+       (tiny:header-response :x-content-type-options  "nosniff")
+       (tiny:header-response :x-frame-options  "DENY")
+       (tiny:header-response :x-xss-protection "0")
+       (tiny:header-response :cache-control "no-store")
+       (tiny:header-response :pragma "no-cache")
+       (tiny:header-response :content-security-policy
+                             "default-src 'none'; frame-ancestors 'none'; sandbox")))))
+
+(defun wrap-require-json-content-type (handler)
+  (tiny:wrap-request-mapper
+   handler
+   (lambda (request)
+     (let ((request-method (tiny:request-method request)))
+       (if (and (eq request-method :post)
+                (not (str:starts-with-p "application/json" (tiny:content-type request ""))))
+           ;; TODO: Return HTTP 415 instead of HTTP 400
+           (error:natter-validation-error "Invalid content-type")
+           request)))))
