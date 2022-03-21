@@ -3,6 +3,7 @@
 (uiop:define-package :cl-natter.middleware
   (:use :cl)
   (:local-nicknames (:error :cl-natter.error)
+                    (:rate-limiter :cl-natter.rate-limiter)
                     (:util :cl-natter.util))
   (:import-from :tiny-routes)
   (:export #:wrap-request-body
@@ -10,7 +11,8 @@
            #:wrap-response-json-body
            #:wrap-condition
            #:wrap-sane-headers
-           #:wrap-require-json-content-type))
+           #:wrap-require-json-content-type
+           #:wrap-rate-limiter))
 
 (in-package :cl-natter.middleware)
 
@@ -41,7 +43,6 @@
        (tiny:header-response :content-type "application/json;charset=utf-8")
        (tiny:body-mapper-response #'jojo:to-json)))))
 
-
 (defun wrap-condition (handler)
   (lambda (request)
     (handler-case (funcall handler request)
@@ -65,12 +66,19 @@
                              "default-src 'none'; frame-ancestors 'none'; sandbox")))))
 
 (defun wrap-require-json-content-type (handler)
-  (tiny:wrap-request-mapper
-   handler
-   (lambda (request)
-     (let ((request-method (tiny:request-method request)))
-       (if (and (eq request-method :post)
-                (not (str:starts-with-p "application/json" (tiny:content-type request ""))))
-           ;; TODO: Return HTTP 415 instead of HTTP 400
-           (error:natter-validation-error "Invalid content-type")
-           request)))))
+  (declare (ignorable handler))
+  (lambda (request)
+    (let ((request-method (tiny:request-method request)))
+      (if (and (eq request-method :post)
+               (not (str:starts-with-p "application/json" (tiny:content-type request ""))))
+          (tiny:make-response :status 415 :body (util:error-response "Unsupported media type"))
+          (funcall handler request)))))
+
+(defun wrap-rate-limiter (handler)
+  (declare (ignorable handler))
+  (lambda (request)
+    (if (rate-limiter:try-acquire)
+        (funcall handler request)
+        (tiny:make-response :status 429
+                            :headers '(:retry-after "2")
+                            :body (util:error-response "Too many requests")))))

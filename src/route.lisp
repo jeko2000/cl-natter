@@ -33,10 +33,13 @@
 
 (define-routes api-routes
   (pipe space-routes
-    (middleware:wrap-request-json-body)
     (middleware:wrap-require-json-content-type)
     (middleware:wrap-condition)
+    (middleware:wrap-rate-limiter)
     (middleware:wrap-response-json-body)
+    ;; We should keep this middleware towards the end to prevent
+    ;; spurious hunchentoot errors about closed response streams
+    (middleware:wrap-request-json-body)
     (middleware:wrap-sane-headers))
 
   ;; catch all route

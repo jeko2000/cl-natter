@@ -2,7 +2,8 @@
 (in-package :cl-user)
 (uiop:define-package :cl-natter.server
   (:use :cl)
-  (:local-nicknames (:route :cl-natter.route))
+  (:local-nicknames (:route :cl-natter.route)
+                    (:rate-limiter :cl-natter.rate-limiter))
   (:export #:*default-http-server-port*
            #:start-http-server
            #:stop-http-server))
@@ -19,6 +20,7 @@
 
 (defun stop-http-server ()
   (when *http-server*
+    (rate-limiter:stop-rate-limiter)
     (clack:stop *http-server*)
     (setf *http-server* nil)))
 
@@ -28,5 +30,7 @@
 
 (defun start-http-server (&key (port *default-http-server-port*))
   (stop-http-server)
+  (let ((permits-per-second 2))
+    (rate-limiter:start-rate-limiter permits-per-second))
   (setf *handler* (compute-handler))
   (setf *http-server* (clack:clackup *handler* :port port)))

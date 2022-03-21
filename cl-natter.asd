@@ -20,6 +20,7 @@
                (:module "controller"
                 :serial t
                 :components ((:file "space")))
+               (:file "rate-limiter")
                (:file "middleware")
                (:file "route")
                (:file "server")
