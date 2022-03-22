@@ -4,15 +4,18 @@
   (:use :cl)
   (:local-nicknames (:error :cl-natter.error)
                     (:rate-limiter :cl-natter.rate-limiter)
+                    (:user :cl-natter.controller.user)
                     (:util :cl-natter.util))
   (:import-from :tiny-routes)
+
   (:export #:wrap-request-body
            #:wrap-request-json-body
            #:wrap-response-json-body
            #:wrap-condition
            #:wrap-sane-headers
            #:wrap-require-json-content-type
-           #:wrap-rate-limiter))
+           #:wrap-rate-limiter
+           #:wrap-auth))
 
 (in-package :cl-natter.middleware)
 
@@ -82,3 +85,13 @@
         (tiny:make-response :status 429
                             :headers '(:retry-after "2")
                             :body (util:error-response "Too many requests")))))
+
+(defun wrap-auth (handler)
+  (tiny:wrap-request-mapper
+   handler
+   (lambda (request)
+     (let ((authorization (tiny:request-header request "authorization")))
+       (multiple-value-bind (username password) (util:parse-basic-authorization authorization)
+         (if (and username password (user:authenticate username password))
+             (tiny:request-append request :subject username)
+             request))))))

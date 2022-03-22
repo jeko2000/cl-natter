@@ -13,13 +13,16 @@
                :clack
                :jonathan
                :cl-ppcre
-               :str)
+               :str
+               :cl-bcrypt
+               :cl-base64)
   :components ((:file "error")
                (:file "util")
                (:file "db")
                (:module "controller"
                 :serial t
-                :components ((:file "space")))
+                :components ((:file "space")
+                             (:file "user")))
                (:file "rate-limiter")
                (:file "middleware")
                (:file "route")

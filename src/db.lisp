@@ -45,7 +45,13 @@
       message_text   VARCHAR(1024) NOT NULL,
       created_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)")
   (execute "CREATE INDEX IF NOT EXISTS message_timestamp_idx ON messages(created_at)")
-  (execute "CREATE UNIQUE INDEX IF NOT EXISTS space_name_idx ON spaces(name)"))
+  (execute "CREATE UNIQUE INDEX IF NOT EXISTS space_name_idx ON spaces(name)")
+  ;; Add users table
+  (execute "
+    CREATE TABLE IF NOT EXISTS users (
+      user_id VARCHAR(30) PRIMARY KEY,
+      pw_hash VARCHAR(255) NOT NULL
+    )"))
 
 (defun stop-db ()
   (when *db*
