@@ -13,9 +13,6 @@
 (defvar *http-server* nil
   "The application's HTTP server.")
 
-(defvar *handler* nil
-  "The application's clack handler.")
-
 (defvar *default-http-server-port* 8001)
 
 (defun stop-http-server ()
@@ -28,9 +25,22 @@
   (lambda (request)
     (funcall route:api-routes request)))
 
+(defun compute-ssl-parameters ()
+  (let ((key (asdf:system-relative-pathname :cl-natter "ssl/localhost-key.pem"))
+        (cert (asdf:system-relative-pathname :cl-natter "ssl/localhost.pem")))
+    (when (and (uiop:file-exists-p key)
+               (uiop:file-exists-p cert))
+      (values t key cert))))
+
 (defun start-http-server (&key (port *default-http-server-port*))
   (stop-http-server)
   (let ((permits-per-second 2))
     (rate-limiter:start-rate-limiter permits-per-second))
-  (setf *handler* (compute-handler))
-  (setf *http-server* (clack:clackup *handler* :port port)))
+  (multiple-value-bind (ssl key-file cert-file) (compute-ssl-parameters)
+    (setf *http-server*
+          (clack:clackup
+           (compute-handler)
+           :port port
+           :ssl ssl
+           :ssl-key-file key-file
+           :ssl-cert-file cert-file))))

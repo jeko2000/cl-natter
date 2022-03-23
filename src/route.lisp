@@ -9,6 +9,7 @@
   (:import-from :tiny-routes
                 #:define-routes
                 #:define-route
+                #:define-get
                 #:define-post
                 #:with-request
                 #:pipe)
@@ -17,6 +18,10 @@
 (in-package :cl-natter.route)
 
 (define-routes user-routes
+
+  (define-get "/status" ()
+    (tiny:ok (list :|status| "live")))
+
   (define-post "/users" (request)
     (with-request (json-body) request
       (let ((username (getf json-body :|username| ""))
