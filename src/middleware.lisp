@@ -54,19 +54,23 @@
       (error:natter-validation-error (e)
         (tiny:bad-request (util:error-response (format nil "~a" e)))))))
 
+(defvar sane-headers
+  (list
+   :server "cl-natter"
+   :x-content-type-options "nosniff"
+   :x-frame-options "DENY"
+   :x-xss-protection "0"
+   :cache-control "no-store"
+   :pragma "no-cache"
+   :content-security-policy "default-src 'none'; frame-ancestors 'none'; sandbox"))
+
 (defun wrap-sane-headers (handler)
   (tiny:wrap-response-mapper
    handler
    (lambda (response)
-     (tiny:pipe response
-       (tiny:header-response :server "cl-natter")
-       (tiny:header-response :x-content-type-options  "nosniff")
-       (tiny:header-response :x-frame-options  "DENY")
-       (tiny:header-response :x-xss-protection "0")
-       (tiny:header-response :cache-control "no-store")
-       (tiny:header-response :pragma "no-cache")
-       (tiny:header-response :content-security-policy
-                             "default-src 'none'; frame-ancestors 'none'; sandbox")))))
+     (tiny:headers-response
+      response
+      (append (tiny:response-headers response) sane-headers)))))
 
 (defun wrap-require-json-content-type (handler)
   (declare (ignorable handler))
