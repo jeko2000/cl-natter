@@ -50,8 +50,16 @@
   (execute "
     CREATE TABLE IF NOT EXISTS users (
       user_id VARCHAR(30) PRIMARY KEY,
-      pw_hash VARCHAR(255) NOT NULL
-    )"))
+      pw_hash VARCHAR(255) NOT NULL)")
+  ;; Add audit log
+  (execute "
+    CREATE TABLE IF NOT EXISTS audit_log (
+      audit_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+      method     VARCHAR(10) NOT NULL,
+      path       VARCHAR(100) NOT NULL,
+      user_id    VARCHAR(30),
+      status     INTEGER,
+      audit_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))
 
 (defun stop-db ()
   (when *db*

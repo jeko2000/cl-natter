@@ -2,11 +2,18 @@
 (in-package :cl-user)
 (uiop:define-package :cl-natter.middleware
   (:use :cl)
-  (:local-nicknames (:error :cl-natter.error)
+  (:local-nicknames (:audit :cl-natter.controller.audit)
+                    (:error :cl-natter.error)
                     (:rate-limiter :cl-natter.rate-limiter)
                     (:user :cl-natter.controller.user)
                     (:util :cl-natter.util))
-  (:import-from :tiny-routes)
+  (:import-from :tiny-routes
+                #:wrap-request-mapper
+                #:wrap-response-mapper
+                #:request-append
+                #:pipe
+                #:with-request
+                #:request-body)
 
   (:export #:wrap-request-body
            #:wrap-request-json-body
@@ -15,34 +22,35 @@
            #:wrap-sane-headers
            #:wrap-require-json-content-type
            #:wrap-rate-limiter
-           #:wrap-auth))
+           #:wrap-auth
+           #:wrap-audit-log))
 
 (in-package :cl-natter.middleware)
 
 (defun wrap-request-body (handler)
-  (tiny:wrap-request-mapper
+  (wrap-request-mapper
    handler
    (lambda (request)
-     (tiny:with-request (request-method raw-body) request
+     (with-request (request-method raw-body) request
        (let ((body (if (member request-method '(:patch :post :put))
                        (tiny-routes.middleware::read-stream-to-string raw-body)
                        "")))
-         (tiny:request-append request :request-body body))))))
+         (request-append request :request-body body))))))
 
 (defun wrap-request-json-body (handler)
   (wrap-request-body
-   (tiny:wrap-request-mapper
+   (wrap-request-mapper
     handler
     (lambda (request)
-      (let* ((request-body (tiny:request-body request))
+      (let* ((request-body (request-body request))
              (json-body (jojo:parse request-body)))
-        (tiny:request-append request :json-body json-body))))))
+        (request-append request :json-body json-body))))))
 
 (defun wrap-response-json-body (handler)
-  (tiny:wrap-response-mapper
+  (wrap-response-mapper
    handler
    (lambda (response)
-     (tiny:pipe response
+     (pipe response
        (tiny:header-response :content-type "application/json;charset=utf-8")
        (tiny:body-mapper-response #'jojo:to-json)))))
 
@@ -65,7 +73,7 @@
    :content-security-policy "default-src 'none'; frame-ancestors 'none'; sandbox"))
 
 (defun wrap-sane-headers (handler)
-  (tiny:wrap-response-mapper
+  (wrap-response-mapper
    handler
    (lambda (response)
      (tiny:headers-response
@@ -91,11 +99,18 @@
                             :body (util:error-response "Too many requests")))))
 
 (defun wrap-auth (handler)
-  (tiny:wrap-request-mapper
+  (wrap-request-mapper
    handler
    (lambda (request)
      (let ((authorization (tiny:request-header request "authorization")))
        (multiple-value-bind (username password) (util:parse-basic-authorization authorization)
          (if (and username password (user:authenticate username password))
-             (tiny:request-append request :subject username)
+             (request-append request :subject username)
              request))))))
+
+(defun wrap-audit-log (handler)
+  (lambda (request)
+    (let* ((audit-id (audit:audit-request-start request))
+           (response (funcall handler (request-append request :audit-id audit-id))))
+      (audit:audit-request-end request response)
+      response)))

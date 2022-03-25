@@ -22,7 +22,8 @@
                (:module "controller"
                 :serial t
                 :components ((:file "space")
-                             (:file "user")))
+                             (:file "user")
+                             (:file "audit")))
                (:file "rate-limiter")
                (:file "middleware")
                (:file "route")
