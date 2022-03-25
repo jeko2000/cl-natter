@@ -18,7 +18,7 @@
 
 (in-package :cl-natter.route)
 
-(define-routes misc-routes
+(define-routes public-routes
   (define-get "/status" ()
     (tiny:ok (list :|status| "live")))
 
@@ -29,27 +29,30 @@
         (tiny:ok (audit:read-audit-log :lookback-hours lookback-hours))))))
 
 (define-routes user-routes
-  (define-post "/users" (request)
-    (with-request (json-body) request
-      (let ((username (getf json-body :|username| ""))
-            (password (getf json-body :|password| "")))
-        (user:register-user username password)
-        (tiny:created (format nil "/users/~a" username) (list :|username| username))))))
+  (middleware:wrap-require-authentication
+   (define-post "/users" (request)
+     (with-request (json-body) request
+       (let ((username (getf json-body :|username| ""))
+             (password (getf json-body :|password| "")))
+         (user:register-user username password)
+         (tiny:created (format nil "/users/~a" username) (list :|username| username)))))))
 
 (define-routes space-routes
-  (define-post "/spaces" (request)
-    (with-request (subject json-body) request
-      (let* ((space-name (getf json-body :|name| ""))
-             (owner (getf json-body :|owner| ""))
-             (space-id (space:create-space space-name owner subject))
-             (uri (format nil "/spaces/~a" space-id)))
-        (tiny:created uri (list :|name| space-name :|uri| uri))))))
+  (middleware:wrap-require-authentication
+   (define-post "/spaces" (request)
+     (with-request (subject json-body) request
+       (let* ((space-name (getf json-body :|name| ""))
+              (owner (getf json-body :|owner| ""))
+              (space-id (space:create-space space-name owner subject))
+              (uri (format nil "/spaces/~a" space-id)))
+         (tiny:created uri (list :|name| space-name :|uri| uri)))))))
 
 (define-routes api-routes
-  (pipe (tiny:routes misc-routes space-routes user-routes)
+  (pipe (tiny:routes public-routes space-routes user-routes)
     (middleware:wrap-require-json-content-type)
     (middleware:wrap-condition)
     (middleware:wrap-audit-log)
+    (middleware:wrap-auth)
     (middleware:wrap-rate-limiter)
     (middleware:wrap-response-json-body)
     (tiny:wrap-query-parameters)

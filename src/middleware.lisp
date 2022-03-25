@@ -23,7 +23,8 @@
            #:wrap-require-json-content-type
            #:wrap-rate-limiter
            #:wrap-auth
-           #:wrap-audit-log))
+           #:wrap-audit-log
+           #:wrap-require-authentication))
 
 (in-package :cl-natter.middleware)
 
@@ -114,3 +115,14 @@
            (response (funcall handler (request-append request :audit-id audit-id))))
       (audit:audit-request-end request response)
       response)))
+
+(defvar *default-www-authenticate-header-value*
+  "Basic realm=\"/\", charset=\"UTF-8\"")
+
+(defun wrap-require-authentication (handler)
+  (declare (ignorable handler))
+  (lambda (request)
+    (uiop:if-let ((subject (tiny:request-get request :subject)))
+      (funcall handler request)
+      (tiny:make-response :status 401 :headers (list :www-authenticate *default-www-authenticate-header-value*)
+                          :body (util:error-response "Unauthorized")))))
