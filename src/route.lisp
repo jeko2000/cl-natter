@@ -6,12 +6,14 @@
                     (:error :cl-natter.error)
                     (:middleware :cl-natter.middleware)
                     (:space :cl-natter.controller.space)
-                    (:user :cl-natter.controller.user))
+                    (:user :cl-natter.controller.user)
+                    (:moderator :cl-natter.controller.moderator))
   (:import-from :tiny-routes
                 #:define-routes
                 #:define-route
                 #:define-get
                 #:define-post
+                #:define-delete
                 #:with-request
                 #:pipe)
   (:export #:api-routes))
@@ -19,36 +21,21 @@
 (in-package :cl-natter.route)
 
 (define-routes public-routes
-  (define-get "/status" ()
-    (tiny:ok (list :|status| "live")))
+  (define-get "/status" () (tiny:ok (list :|status| "live")))
+  (define-get "/logs" (request) (audit:read-audit-log request)))
 
-  (define-get "/logs" (request)
-    (with-request (query-parameters) request
-      (let* ((lookback-hours (getf query-parameters :|lookback_hours| ""))
-             (lookback-hours (parse-integer lookback-hours :junk-allowed t)))
-        (tiny:ok (audit:read-audit-log :lookback-hours lookback-hours))))))
-
-(define-routes user-routes
-  (middleware:wrap-require-authentication
-   (define-post "/users" (request)
-     (with-request (json-body) request
-       (let ((username (getf json-body :|username| ""))
-             (password (getf json-body :|password| "")))
-         (user:register-user username password)
-         (tiny:created (format nil "/users/~a" username) (list :|username| username)))))))
-
-(define-routes space-routes
-  (middleware:wrap-require-authentication
-   (define-post "/spaces" (request)
-     (with-request (subject json-body) request
-       (let* ((space-name (getf json-body :|name| ""))
-              (owner (getf json-body :|owner| ""))
-              (space-id (space:create-space space-name owner subject))
-              (uri (format nil "/spaces/~a" space-id)))
-         (tiny:created uri (list :|name| space-name :|uri| uri)))))))
+(define-routes private-routes
+  (define-post "/users" (request) (user:register-user request))
+  ;; spaces
+  (define-post "/spaces" (request) (space:create-space request))
+  (define-post "/spaces/:space_id/messages" (request) (space:post-message request))
+  (define-get "/spaces/:space_id/messages/:message_id" (request) (space:read-message request))
+  (define-get "/spaces/:space_id/messages" (request) (space:find-messages request))
+  (define-post "/spaces/:space_id/members" (request) (space:add-member request))
+  (define-delete "/spaces/:space_id/messages/:message_id" (request) (moderator:delete-post request)))
 
 (define-routes api-routes
-  (pipe (tiny:routes public-routes space-routes user-routes)
+  (pipe (tiny:routes public-routes (middleware:wrap-require-authentication private-routes))
     (middleware:wrap-require-json-content-type)
     (middleware:wrap-condition)
     (middleware:wrap-audit-log)

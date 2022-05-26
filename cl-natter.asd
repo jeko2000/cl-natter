@@ -23,7 +23,8 @@
                 :serial t
                 :components ((:file "space")
                              (:file "user")
-                             (:file "audit")))
+                             (:file "audit")
+                             (:file "moderator")))
                (:file "rate-limiter")
                (:file "middleware")
                (:file "route")

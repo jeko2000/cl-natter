@@ -3,7 +3,8 @@
 (uiop:define-package :cl-natter.util
   (:use :cl)
   (:export #:error-response
-           #:parse-basic-authorization))
+           #:parse-basic-authorization
+           #:map-plist-values))
 
 (in-package :cl-natter.util)
 
@@ -18,3 +19,8 @@
       (destructuring-bind (username password &rest other) (uiop:split-string credentials :separator '(#\:))
         (unless other
           (values username password))))))
+
+(defun map-plist-values (plist function)
+  (loop for (k v) on plist by #'cddr
+        collect k
+        collect (funcall function v)))

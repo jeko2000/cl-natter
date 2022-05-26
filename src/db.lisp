@@ -2,10 +2,12 @@
 (in-package :cl-user)
 (uiop:define-package :cl-natter.db
   (:use :cl)
+  (:local-nicknames (:error :cl-natter.error))
   (:import-from :cl-dbi)
   (:export #:*db*
            #:execute
            #:query-one
+           #:ensure-one
            #:query-all
            #:stop-db
            #:start-db))
@@ -25,6 +27,14 @@
 
 (defun query-one (sql &rest args)
   (dbi:fetch (apply #'query sql args)))
+
+(defun ensure-one (sql &rest args)
+  (let ((rows (apply #'query-all sql args)))
+    (unless rows
+      (error:natter-not-found-error "No such resource found"))
+    (when (cdr rows)
+      (error:natter-not-found-error "Too many resources found"))
+    (car rows)))
 
 (defun query-all (sql &rest args)
   (let ((query (apply #'query sql args) ))
