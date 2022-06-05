@@ -28,12 +28,12 @@
     (setf *app-status* :stopped))
   *app-status*)
 
-(defun start-app (&optional force-restart-p)
+(defun start-app (&key (db-path-name "db/cl-natter.db") force-restart-p)
   (when (or (stopped-p) force-restart-p)
     (stop-app)
-    (db:start-db (asdf:system-relative-pathname :cl-natter "db/cl-natter.db"))
+    (db:start-db (asdf:system-relative-pathname :cl-natter db-path-name))
     (server:start-http-server)
     (setf *app-status* :running))
   *app-status*)
 
-(start-app t)
+(start-app :force-restart-p t)

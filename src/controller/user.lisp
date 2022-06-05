@@ -1,12 +1,13 @@
 ;;;; user.lisp
 (in-package :cl-user)
 (uiop:define-package :cl-natter.controller.user
-  (:use :cl)
+  (:use :cl :cl-natter.type)
   (:local-nicknames (:db :cl-natter.db)
                     (:error :cl-natter.error))
   (:import-from :tiny-routes
                 #:with-request)
-  (:export #:register-user
+  (:export #:*hash-function*
+           #:register-user
            #:authenticate))
 
 (in-package :cl-natter.controller.user)
@@ -14,27 +15,17 @@
 (defvar *username-scanner*
   (ppcre:create-scanner "^[a-zA-Z][a-zA-Z0-9]{1,29}$"))
 
-(defun check-username (username)
-  (unless (stringp username)
-    (error:natter-validation-error "must provide username"))
-  (unless (ppcre:scan *username-scanner* username)
-    (error:natter-validation-error "invalid username"))
-  username)
+(defun bcrypt-hash (password)
+  (bcrypt:encode (bcrypt:make-password password)))
 
-(defun check-password (password)
-  (unless (stringp password)
-    (error:natter-validation-error "must provide password"))
-  (when (< (length password) 8)
-    (error:natter-validation-error "password must be at least 8 characters"))
-  password)
+(defvar *hash-function* #'bcrypt-hash)
 
-(defun register-user (request)
-  (with-request (json-body) request
-    (let ((username (check-username (getf json-body :|username| "")))
-          (password (check-password (getf json-body :|password| "")))
-          (hash (bcrypt:encode (bcrypt:make-password password))))
-      (db:execute "INSERT INTO users(user_id, pw_hash) VALUES(?,?)" username hash)
-      (tiny:created (format nil "/users/~a" username) (list :|username| username)))))
+(defun register-user (username password)
+  (check-username username)
+  (check-password password)
+  (let ((hash (funcall *hash-function* password)))
+    (db:execute "INSERT INTO users(user_id, pw_hash) VALUES(?,?)" username hash)
+    username))
 
 (defun authenticate (username password)
   (check-username username)

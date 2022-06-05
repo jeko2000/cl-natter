@@ -18,6 +18,7 @@
                :cl-base64)
   :components ((:file "error")
                (:file "util")
+               (:file "type")
                (:file "db")
                (:module "controller"
                 :serial t
@@ -29,4 +30,5 @@
                (:file "middleware")
                (:file "route")
                (:file "server")
-               (:file "cl-natter")))
+               (:file "cl-natter"))
+  :in-order-to ((asdf:test-op (asdf:test-op :cl-natter-test))))

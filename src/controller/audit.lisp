@@ -1,7 +1,7 @@
 ;;;; audit.lisp
 (in-package :cl-user)
 (uiop:define-package :cl-natter.controller.audit
-  (:use :cl)
+  (:use :cl :cl-natter.type)
   (:local-nicknames (:db :cl-natter.db)
                     (:util :cl-natter.util))
   (:import-from :tiny
@@ -16,35 +16,26 @@
 (alexandria:define-constant +default-lookback-hours+ 1)
 (alexandria:define-constant +default-limit+ 20)
 
-(defun check-lookback-hours (lookback-hours)
-  (or (parse-integer (or lookback-hours "") :junk-allowed t)
-      +default-lookback-hours+))
-
-(defun check-limit (limit)
-  (or (parse-integer (or limit "") :junk-allowed t)
-      +default-limit+))
-
 (defun audit-request-start (request)
   (with-request (request-method path-info subject) request
-    (let ((row (db:query-one
-                "INSERT INTO audit_log(method,path,user_id) VALUES (?,?,?) RETURNING audit_id"
-                (symbol-name request-method) path-info subject)))
-      (getf row :|audit_id|))))
+    (db:with-query-results (audit-id)
+        (db:query-one "INSERT INTO audit_log(method,path,user_id) VALUES (?,?,?) RETURNING audit_id"
+                      (symbol-name request-method) path-info subject)
+      audit-id)))
 
 (defun audit-request-end (request response)
   (with-request (request-method path-info subject) request
-    (let* ((status (response-status response))
-           (row (db:query-one
-                 "INSERT INTO audit_log(method,path,user_id,status)
-                 VALUES (?,?,?,?) RETURNING audit_id"
-                 (symbol-name request-method) path-info subject status)))
-      (getf row :|audit_id|))))
+    (db:with-query-results (audit-id)
+        (db:query-one "INSERT INTO audit_log(method,path,user_id,status) VALUES (?,?,?,?) RETURNING audit_id"
+                      (symbol-name request-method) path-info subject (response-status response))
+      audit-id)))
 
-(defun read-audit-log (request)
-  (with-request (query-parameters) request
-    (let ((lookback-hours (check-lookback-hours (getf query-parameters :|lookback_hours|)))
-          (limit (check-limit (getf query-parameters :|limit|))))
-      (tiny:ok (read-audit-log* :lookback-hours lookback-hours :limit limit)))))
+(defun read-audit-log (&key lookback-hours limit)
+  (setf lookback-hours (check-lookback (or lookback-hours +default-lookback-hours+))
+        limit (check-limit (or limit +default-limit+)))
+  (loop for row in (db:query-all "SELECT * FROM audit_log WHERE audit_time>=DATETIME('now', ?) LIMIT ?"
+                                 (format nil "-~D hour" lookback-hours) limit)
+        collect (record-to-json row)))
 
 (defun record-to-json (row)
   (list

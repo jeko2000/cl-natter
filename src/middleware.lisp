@@ -13,37 +13,30 @@
                 #:request-append
                 #:pipe
                 #:with-request
-                #:request-body)
+                #:request-body
+                #:wrap-request-body)
 
-  (:export #:wrap-request-body
-           #:wrap-request-json-body
-           #:wrap-response-json-body
-           #:wrap-condition
-           #:wrap-sane-headers
-           #:wrap-require-json-content-type
-           #:wrap-rate-limiter
-           #:wrap-auth
-           #:wrap-audit-log
-           #:wrap-require-authentication))
+  (:export
+   #:with-json
+   #:wrap-request-body
+   #:wrap-request-json-body
+   #:wrap-response-json-body
+   #:wrap-condition
+   #:wrap-sane-headers
+   #:wrap-require-json-content-type
+   #:wrap-rate-limiter
+   #:wrap-auth
+   #:wrap-audit-log
+   #:wrap-require-authentication))
 
 (in-package :cl-natter.middleware)
-
-(defun wrap-request-body (handler)
-  (wrap-request-mapper
-   handler
-   (lambda (request)
-     (with-request (request-method raw-body) request
-       (let ((body (if (member request-method '(:patch :post :put))
-                       (tiny-routes.middleware::read-stream-to-string raw-body)
-                       "")))
-         (request-append request :request-body body))))))
 
 (defun wrap-request-json-body (handler)
   (wrap-request-body
    (wrap-request-mapper
     handler
     (lambda (request)
-      (let* ((request-body (request-body request))
+      (let* ((request-body (or (request-body request) ""))
              (json-body (jojo:parse request-body)))
         (request-append request :json-body json-body))))))
 
@@ -61,7 +54,9 @@
       (jojo:<jonathan-error> ()
         (tiny:bad-request (util:error-response "Unparsable JSON")))
       (error:natter-validation-error (e)
-        (tiny:bad-request (util:error-response (format nil "~a" e)))))))
+        (tiny:bad-request (util:error-response (format nil "~a" e))))
+      (error:natter-not-found-error ()
+        (tiny:not-found (util:error-response "No such resource found"))))))
 
 (defvar sane-headers
   (list

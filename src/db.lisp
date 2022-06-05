@@ -2,9 +2,11 @@
 (in-package :cl-user)
 (uiop:define-package :cl-natter.db
   (:use :cl)
-  (:local-nicknames (:error :cl-natter.error))
+  (:local-nicknames (:error :cl-natter.error)
+                    (:util :cl-natter.util))
   (:import-from :cl-dbi)
   (:export #:*db*
+           #:with-query-results
            #:execute
            #:query-one
            #:ensure-one
@@ -16,6 +18,10 @@
 
 (defvar *db* nil
   "The Natter's API database.")
+
+
+(defmacro with-query-results (query-vars results &body body)
+  `(util:with-payload ,query-vars ,results ,@body))
 
 ;;; util
 (defun execute (sql &rest args)
