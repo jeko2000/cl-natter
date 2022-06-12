@@ -6,3 +6,6 @@
 .cache/
 *.log
 *.log.*
+db/
+ssl/
+*.rest

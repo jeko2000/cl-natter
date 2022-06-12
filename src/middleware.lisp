@@ -4,6 +4,7 @@
   (:use :cl)
   (:local-nicknames (:audit :cl-natter.controller.audit)
                     (:error :cl-natter.error)
+                    (:log :cl-natter.logger)
                     (:rate-limiter :cl-natter.rate-limiter)
                     (:user :cl-natter.controller.user)
                     (:util :cl-natter.util))
@@ -15,7 +16,6 @@
                 #:with-request
                 #:request-body
                 #:wrap-request-body)
-
   (:export
    #:with-json
    #:wrap-request-body
@@ -27,7 +27,8 @@
    #:wrap-rate-limiter
    #:wrap-auth
    #:wrap-audit-log
-   #:wrap-require-authentication))
+   #:wrap-require-authentication
+   #:wrap-logging))
 
 (in-package :cl-natter.middleware)
 
@@ -44,9 +45,11 @@
   (wrap-response-mapper
    handler
    (lambda (response)
-     (pipe response
-       (tiny:header-response :content-type "application/json;charset=utf-8")
-       (tiny:body-mapper-response #'jojo:to-json)))))
+     (tiny:clone-response
+      response
+      :headers (append (list :content-type "application/json;charset=utf-8")
+                       (tiny:response-headers response))
+      :body (jojo:to-json (tiny:response-body response))))))
 
 (defun wrap-condition (handler)
   (lambda (request)
@@ -72,18 +75,19 @@
   (wrap-response-mapper
    handler
    (lambda (response)
-     (tiny:headers-response
-      response
-      (append (tiny:response-headers response) sane-headers)))))
+     (tiny:clone-response response
+                          :headers (append (tiny:response-headers response) sane-headers)))))
 
-(defun wrap-require-json-content-type (handler)
-  (declare (ignorable handler))
+(defun wrap-require-json-content-type--internal (handler)
   (lambda (request)
     (let ((request-method (tiny:request-method request)))
       (if (and (eq request-method :post)
                (not (str:starts-with-p "application/json" (tiny:content-type request ""))))
           (tiny:make-response :status 415 :body (util:error-response "Unsupported media type"))
           (funcall handler request)))))
+
+(defun wrap-require-json-content-type (handler)
+  (tiny:wrap-post-match-middleware handler #'wrap-require-json-content-type--internal))
 
 (defun wrap-rate-limiter (handler)
   (declare (ignorable handler))
@@ -114,10 +118,24 @@
 (defvar *default-www-authenticate-header-value*
   "Basic realm=\"/\", charset=\"UTF-8\"")
 
-(defun wrap-require-authentication (handler)
+(defun wrap-require-authentication--internal (handler)
   (declare (ignorable handler))
   (lambda (request)
     (uiop:if-let ((subject (tiny:request-get request :subject)))
       (funcall handler request)
       (tiny:make-response :status 401 :headers (list :www-authenticate *default-www-authenticate-header-value*)
                           :body (util:error-response "Unauthorized")))))
+
+(defun wrap-require-authentication (handler)
+  (tiny:wrap-post-match-middleware handler #'wrap-require-authentication--internal))
+
+(defun wrap-logging (handler)
+  (lambda (request)
+    (let ((start (get-internal-real-time)))
+      (tiny:with-request (request-method path-info request-body) request
+        (log:info :middleware "Handling HTTP ~a to ~s, body ~s" request-method path-info request-body)
+        (let* ((response (funcall handler request))
+               (duration (/ (- (get-internal-real-time) start) internal-time-units-per-second)))
+          (log:info :middleware "Handled HTTP ~a to ~s after ~fs with status ~a"
+                    request-method path-info duration (tiny:response-status response))
+          response)))))

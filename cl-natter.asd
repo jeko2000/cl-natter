@@ -15,8 +15,10 @@
                :cl-ppcre
                :str
                :cl-bcrypt
-               :cl-base64)
+               :cl-base64
+               :verbose)
   :components ((:file "error")
+               (:file "logger")
                (:file "util")
                (:file "type")
                (:file "db")

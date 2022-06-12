@@ -3,6 +3,7 @@
 (uiop:define-package :cl-natter
   (:use :cl)
   (:local-nicknames (:db :cl-natter.db)
+                    (:log :cl-natter.logger)
                     (:server :cl-natter.server))
   (:export #:start-app
            #:stop-app))
@@ -31,6 +32,7 @@
 (defun start-app (&key (db-path-name "db/cl-natter.db") force-restart-p)
   (when (or (stopped-p) force-restart-p)
     (stop-app)
+    (log:initialize-logger)
     (db:start-db (asdf:system-relative-pathname :cl-natter db-path-name))
     (server:start-http-server)
     (setf *app-status* :running))

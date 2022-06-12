@@ -3,6 +3,7 @@
 (uiop:define-package :cl-natter.controller.audit
   (:use :cl :cl-natter.type)
   (:local-nicknames (:db :cl-natter.db)
+                    (:log :cl-natter.logger)
                     (:util :cl-natter.util))
   (:import-from :tiny
                 #:with-request
@@ -33,6 +34,7 @@
 (defun read-audit-log (&key lookback-hours limit)
   (setf lookback-hours (check-lookback (or lookback-hours +default-lookback-hours+))
         limit (check-limit (or limit +default-limit+)))
+  (log:info :audit "Attempting to read audit log with lookback ~Ahrs and limit ~A" lookback-hours limit)
   (loop for row in (db:query-all "SELECT * FROM audit_log WHERE audit_time>=DATETIME('now', ?) LIMIT ?"
                                  (format nil "-~D hour" lookback-hours) limit)
         collect (record-to-json row)))

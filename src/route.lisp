@@ -28,18 +28,25 @@
 (in-package :cl-natter.route)
 
 (define-routes public-routes
-  (define-get "/status" () (tiny:ok (list :|status| "live")))
-  (define-post "/echo" (request) (tiny:ok (util:map-plist-values request #'util:to-string)))
-  (define-get "/logs" (request) (audit:read-audit-log request)))
+  (define-get "/status" ()
+    (tiny:ok (list :|status| "live")))
 
-(define-routes private-routes
+  (define-post "/echo" (request)
+    (tiny:ok (util:map-plist-values request #'util:to-string)))
+
+  (define-get "/logs" (request)
+    (with-query-parameters (lookback-hours limit) request
+      (let ((logs (audit:read-audit-log :lookback-hours lookback-hours :limit limit)))
+        (tiny:ok (list :|logs| logs)))))
+
   ;; register-user
   (define-post "/users" (request)
     (with-request-payload (username password) request
       (user:register-user username password)
       (let ((uri (str:concat "/users/" username)))
-        (tiny:created uri (list :|username| username)))))
+        (tiny:created uri (list :|username| username))))))
 
+(define-routes private-routes
   ;; create-space
   (define-post "/spaces" (request)
     (with-request-payload (name owner) request
