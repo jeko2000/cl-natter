@@ -54,7 +54,7 @@
              (username (format nil "samplespace~d" n))
              (body `(:|username| ,username :|password| "sample-password"))
              (request (mock-request :path "/users" :method :post :json-body body))
-             (response (funcall route::private-routes request))
+             (response (funcall route::public-routes request))
              (uri (format nil "/users/~a" username)))
         (matches `(201 (:location ,uri) (:|username| ,username)) response)))))
 

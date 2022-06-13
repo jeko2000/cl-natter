@@ -6,6 +6,7 @@
                     (:error :cl-natter.error)
                     (:log :cl-natter.logger)
                     (:rate-limiter :cl-natter.rate-limiter)
+                    (:session :cl-natter.session)
                     (:user :cl-natter.controller.user)
                     (:util :cl-natter.util))
   (:import-from :tiny-routes
@@ -28,7 +29,8 @@
    #:wrap-auth
    #:wrap-audit-log
    #:wrap-require-authentication
-   #:wrap-logging))
+   #:wrap-logging
+   #:wrap-session-request))
 
 (in-package :cl-natter.middleware)
 
@@ -139,3 +141,13 @@
           (log:info :middleware "Handled HTTP ~a to ~s after ~fs with status ~a"
                     request-method path-info duration (tiny:response-status response))
           response)))))
+
+(defun wrap-session-request (handler &key (session-id-parser #'session:parse-session-id))
+  (wrap-request-mapper
+   handler
+   (lambda (request)
+     (let* ((sid (funcall session-id-parser request))
+            (session (and sid (session:read-session* sid))))
+       (pipe request
+         (request-append :session session)
+         (request-append :session-id sid))))))

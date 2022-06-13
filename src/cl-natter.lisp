@@ -4,7 +4,8 @@
   (:use :cl)
   (:local-nicknames (:db :cl-natter.db)
                     (:log :cl-natter.logger)
-                    (:server :cl-natter.server))
+                    (:server :cl-natter.server)
+                    (:session :cl-natter.session))
   (:export #:start-app
            #:stop-app))
 
@@ -33,6 +34,7 @@
   (when (or (stopped-p) force-restart-p)
     (stop-app)
     (log:initialize-logger)
+    (session:initialize-session)
     (db:start-db (asdf:system-relative-pathname :cl-natter db-path-name))
     (server:start-http-server)
     (setf *app-status* :running))

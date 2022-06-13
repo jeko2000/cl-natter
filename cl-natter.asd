@@ -7,21 +7,26 @@
   :version "0.0.1"
   :serial t
   :pathname "src/"
-  :depends-on (:uiop
+  :depends-on (:cl-base64
+               :cl-bcrypt
+               :cl-cookie
                :cl-dbi
-               :tiny-routes
+               :cl-ppcre
                :clack
                :jonathan
-               :cl-ppcre
                :str
-               :cl-bcrypt
-               :cl-base64
+               :synchronized-hash-tables
+               :tiny-routes
+               :tiny-routes-middleware-cookie
+               :uuid
+               :uiop
                :verbose)
   :components ((:file "error")
                (:file "logger")
                (:file "util")
                (:file "type")
                (:file "db")
+               (:file "session")
                (:module "controller"
                 :serial t
                 :components ((:file "space")

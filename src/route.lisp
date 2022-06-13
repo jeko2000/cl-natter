@@ -5,9 +5,11 @@
   (:local-nicknames (:audit :cl-natter.controller.audit)
                     (:error :cl-natter.error)
                     (:middleware :cl-natter.middleware)
+                    (:moderator :cl-natter.controller.moderator)
+                    (:mw-cookie :tiny-routes.middleware.cookie)
+                    (:session :cl-natter.session)
                     (:space :cl-natter.controller.space)
                     (:user :cl-natter.controller.user)
-                    (:moderator :cl-natter.controller.moderator)
                     (:util :cl-natter.util))
   (:import-from :cl-natter.middleware
                 #:with-json)
@@ -33,6 +35,13 @@
 
   (define-post "/echo" (request)
     (tiny:ok (util:map-plist-values request #'util:to-string)))
+
+  (define-post "/echo-sessions" (request)
+    (let ((session (session:request-session request :create-p t)))
+      (setf (gethash :timestamp session) (get-universal-time))
+      (session:session-response
+       (tiny:ok (util:map-plist-values request #'util:to-string))
+       session)))
 
   (define-get "/logs" (request)
     (with-query-parameters (lookback-hours limit) request
@@ -102,11 +111,14 @@
     (middleware:wrap-auth)
     (middleware:wrap-rate-limiter)
     (middleware:wrap-response-json-body)
+    (middleware:wrap-session-request)
+    (mw-cookie:wrap-request-cookies)
     (tiny:wrap-query-parameters)
     ;; We should keep this middleware towards the end to prevent
     ;; spurious hunchentoot errors about closed response streams
     (middleware:wrap-request-json-body)
-    (middleware:wrap-sane-headers))
+    (middleware:wrap-sane-headers)
+    (middleware:wrap-logging))
 
   ;; catch all route
   (define-route ()
