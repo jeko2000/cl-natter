@@ -50,13 +50,13 @@
   password)
 
 (defun check-space-id (space-id)
-  (let ((parsed-id (util:to-integer space-id)))
+  (let ((parsed-id (util:->integer space-id)))
     (unless parsed-id
       (error:natter-validation-error "invalid space id ~a" space-id))
     (abs parsed-id)))
 
 (defun check-message-id (message-id)
-  (let ((parsed-id (util:to-integer message-id)))
+  (let ((parsed-id (util:->integer message-id)))
     (unless parsed-id
       (error:natter-validation-error "invalid message id ~a" message-id))
     (abs parsed-id)))
@@ -82,7 +82,7 @@
   message-body)
 
 (defun check-lookback (lookback)
-  (let ((parsed-id (util:to-integer lookback)))
+  (let ((parsed-id (util:->integer lookback)))
     (unless parsed-id
       (error:natter-validation-error "invalid lookback ~a" lookback))
     (abs parsed-id)))
@@ -95,7 +95,7 @@
   permissions)
 
 (defun check-limit (limit)
-  (let ((parsed (util:to-integer limit)))
+  (let ((parsed (util:->integer limit)))
     (unless parsed
       (error:natter-validation-error "invalid limit ~a" limit))
     (abs parsed)))

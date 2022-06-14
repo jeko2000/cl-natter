@@ -5,7 +5,8 @@
   (:local-nicknames (:db :cl-natter.db)
                     (:log :cl-natter.logger)
                     (:server :cl-natter.server)
-                    (:session :cl-natter.session))
+                    (:session :cl-natter.session)
+                    (:token :cl-natter.token))
   (:export #:start-app
            #:stop-app))
 
@@ -35,6 +36,7 @@
     (stop-app)
     (log:initialize-logger)
     (session:initialize-session)
+    (token:initialize-token-store)
     (db:start-db (asdf:system-relative-pathname :cl-natter db-path-name))
     (server:start-http-server)
     (setf *app-status* :running))

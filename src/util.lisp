@@ -8,8 +8,8 @@
   (:export #:error-response
            #:parse-basic-authorization
            #:map-plist-values
-           #:to-string
-           #:to-integer
+           #:->string
+           #:->integer
            #:keywordize
            #:with-payload
            #:with-query-results
@@ -36,10 +36,19 @@
         collect k
         collect (funcall function v)))
 
-(defun to-string (item)
-  (format nil "~a" item))
+(defgeneric ->string (object))
 
-(defun to-integer (item &optional default)
+(defmethod ->string (object)
+  (format nil "~A" object))
+
+(defmethod ->string ((object list))
+  (format nil "[~{~A~^ ~}]" (mapcar #'->string object)))
+
+(defmethod ->string ((object hash-table))
+  (format nil "{~{~A=>~A~^, ~}}"
+          (mapcar #'->string (alexandria:hash-table-plist object))))
+
+(defun ->integer (item &optional default)
   (etypecase item
     (null default)
     (number item)

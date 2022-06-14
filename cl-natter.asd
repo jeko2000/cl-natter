@@ -14,6 +14,7 @@
                :cl-ppcre
                :clack
                :jonathan
+               :local-time
                :str
                :synchronized-hash-tables
                :tiny-routes
@@ -27,12 +28,14 @@
                (:file "type")
                (:file "db")
                (:file "session")
+               (:file "token")
                (:module "controller"
                 :serial t
                 :components ((:file "space")
                              (:file "user")
                              (:file "audit")
-                             (:file "moderator")))
+                             (:file "moderator")
+                             (:file "token")))
                (:file "rate-limiter")
                (:file "middleware")
                (:file "route")

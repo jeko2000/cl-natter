@@ -9,6 +9,7 @@
                     (:mw-cookie :tiny-routes.middleware.cookie)
                     (:session :cl-natter.session)
                     (:space :cl-natter.controller.space)
+                    (:token :cl-natter.controller.token)
                     (:user :cl-natter.controller.user)
                     (:util :cl-natter.util))
   (:import-from :cl-natter.middleware
@@ -25,7 +26,8 @@
                 #:define-delete
                 #:with-request
                 #:pipe)
-  (:export #:api-routes))
+  (:export #:api-routes)
+  (:export #:app-routes))
 
 (in-package :cl-natter.route)
 
@@ -34,13 +36,13 @@
     (tiny:ok (list :|status| "live")))
 
   (define-post "/echo" (request)
-    (tiny:ok (util:map-plist-values request #'util:to-string)))
+    (tiny:ok (util:map-plist-values request #'util:->string)))
 
   (define-post "/echo-sessions" (request)
     (let ((session (session:request-session request :create-p t)))
       (setf (gethash :timestamp session) (get-universal-time))
       (session:session-response
-       (tiny:ok (util:map-plist-values request #'util:to-string))
+       (tiny:ok (util:map-plist-values request #'util:->string))
        session)))
 
   (define-get "/logs" (request)
@@ -56,6 +58,9 @@
         (tiny:created uri (list :|username| username))))))
 
 (define-routes private-routes
+  ;; login
+  (define-post "/login" (request) (token:login request))
+
   ;; create-space
   (define-post "/spaces" (request)
     (with-request-payload (name owner) request
@@ -106,20 +111,31 @@
   (pipe (tiny:routes public-routes
                      (middleware:wrap-require-authentication private-routes) private-routes )
     (middleware:wrap-require-json-content-type)
+    (middleware:wrap-response-json-body)
+    (middleware:wrap-sane-headers)))
+
+(define-routes web-routes
+  (define-get "/natter.js" ()
+    (tiny:ok #P"/Users/jruiz/prog/common-lisp/cl-natter/public/natter.js"))
+  (define-get "/natter.html" ()
+    (tiny:ok #P"/Users/jruiz/prog/common-lisp/cl-natter/public/natter.html")))
+
+(define-routes app-routes
+  (pipe (tiny:routes
+         api-routes
+         web-routes
+         ;; catch all route
+         (define-route ()
+           (tiny:not-found "NOT_FOUND")))
+    (middleware:wrap-rate-limiter)
     (middleware:wrap-condition)
     (middleware:wrap-audit-log)
+    (token:wrap-token-auth)
     (middleware:wrap-auth)
-    (middleware:wrap-rate-limiter)
-    (middleware:wrap-response-json-body)
     (middleware:wrap-session-request)
     (mw-cookie:wrap-request-cookies)
     (tiny:wrap-query-parameters)
-    ;; We should keep this middleware towards the end to prevent
-    ;; spurious hunchentoot errors about closed response streams
+    ;; ;; We should keep this middleware towards the end to prevent
+    ;; ;; spurious hunchentoot errors about closed response streams
     (middleware:wrap-request-json-body)
-    (middleware:wrap-sane-headers)
-    (middleware:wrap-logging))
-
-  ;; catch all route
-  (define-route ()
-    (tiny:not-found "NOT_FOUND")))
+    (middleware:wrap-logging)))

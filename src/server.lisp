@@ -23,7 +23,7 @@
 
 (defun compute-handler ()
   (lambda (request)
-    (funcall route:api-routes request)))
+    (funcall route:app-routes request)))
 
 (defun compute-ssl-parameters ()
   (let ((key (asdf:system-relative-pathname :cl-natter "ssl/localhost-key.pem"))

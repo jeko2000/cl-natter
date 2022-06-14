@@ -22,7 +22,7 @@
 
 (in-package :cl-natter.session)
 
-(defvar *session-cookie-name* "natter.sid")
+(defvar *session-cookie-name* "__Host-natter.sid")
 
 (defvar *session-store* nil)
 
@@ -83,7 +83,8 @@
     (unless sid
       (return-from session-response response))
     (prog1 (if (gethash :new-session session)
-               (write-response-cookies response (cookie:make-cookie :name *session-cookie-name* :value sid))
+               (write-response-cookies response (cookie:make-cookie :name *session-cookie-name* :value sid
+                                                                    :secure-p t :httponly-p t :path "/"))
                response)
       (setf (gethash :new-session session) nil)
       (write-session* sid session))))
