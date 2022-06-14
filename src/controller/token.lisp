@@ -25,7 +25,9 @@
   (tiny:wrap-request-mapper
    handler
    (lambda (request)
-     (let ((token (token:read-token* request nil)))
+     ;; read csrf from header
+     (let* ((token-id (tiny:request-header request "x-csrf-token"))
+            (token (and token-id (token:read-token* request token-id))))
        (if (and token (timestamp< (now) (token:token-expiry token)))
            (tiny:pipe request
              (tiny:request-append :subject (token:token-username token))

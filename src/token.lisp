@@ -3,6 +3,7 @@
 (uiop:define-package :cl-natter.token
   (:use :cl)
   (:local-nicknames (:a :alexandria)
+                    (:crypt :cl-natter.crypt)
                     (:session :cl-natter.session))
   (:export #:token
            #:make-token
@@ -52,8 +53,9 @@
     ;; invalidate session if present
     (a:when-let ((session (tiny:request-get request :session)))
       (session:delete-session* (gethash :sid session)))
-    (let* ((session (session:request-session request :create-p t))
-           (token-id (gethash :sid session)))
+    (let* ((session (session:make-session))
+           (session-id (gethash :sid session))
+           (token-id (crypt:base64-url-encode (crypt:sha256-string session-id))))
       (setf (token-id token) token-id
             (gethash :token session) token)
       (session:session-response
@@ -61,10 +63,11 @@
        session))))
 
 (defmethod read-token ((store cookie-token-store) request token-id)
-  (declare (ignore token-id))
-  (tiny:with-request (session) request
-    (when session
-      (gethash :token session))))
+  (a:when-let ((session (tiny:request-get request :session)))
+    (let ((provided (crypt:base64-url-decode token-id))
+          (computed (crypt:sha256-string (gethash :sid session))))
+      (when (crypt:constant-time-equal provided computed)
+        (gethash :token session)))))
 
 (defun initialize-token-store ()
   (setf *token-store* (make-cookie-token-store)))

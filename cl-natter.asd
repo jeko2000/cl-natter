@@ -13,6 +13,7 @@
                :cl-dbi
                :cl-ppcre
                :clack
+               :ironclad
                :jonathan
                :local-time
                :str
@@ -25,6 +26,7 @@
   :components ((:file "error")
                (:file "logger")
                (:file "util")
+               (:file "crypt")
                (:file "type")
                (:file "db")
                (:file "session")

@@ -2,7 +2,8 @@
 (in-package :cl-user)
 (uiop:define-package :cl-natter-test
   (:use :cl :cl-natter :parachute)
-  (:local-nicknames (:db :cl-natter.db)
+  (:local-nicknames (:a :alexandria)
+                    (:db :cl-natter.db)
                     (:middleware :cl-natter.middleware)
                     (:route :cl-natter.route)
                     (:user :cl-natter.controller.user)
@@ -25,15 +26,26 @@
      ,@body))
 
 ;;; util
-(defun mock-request (&rest args &key method path body &allow-other-keys)
+(defun mock-request (&rest args &key method path body basic-auth content-type cookie csrf-token &allow-other-keys)
   (let* ((body (or body ""))
-         (content-length (length body)))
+         (content-length (length body))
+         (headers (make-hash-table :test 'equal))
+         (content-type (or content-type "application/json")))
+    (when basic-auth
+      (setf (gethash "authorization" headers)
+            (format nil "Basic ~A" (apply #'basic-authentication-header basic-auth))))
+    (when cookie
+      (setf (gethash "cookie" headers)
+            (cl-cookie:write-cookie-header cookie)))
+    (when csrf-token
+      (setf (gethash "x-csrf-token" headers) csrf-token))
     (append
      (list :request-method (or method :get)
            :path-info (or path "/")
-           :headers (make-hash-table)
+           :headers headers
            :content-length content-length
-           :raw-body (make-string-input-stream body))
+           :raw-body (make-string-input-stream body)
+           :content-type content-type)
      args)))
 
 (defmacro matches (expected response)
@@ -115,3 +127,48 @@
     (let* ((request (mock-request :path "/spaces/1/messages/1" :method :delete))
            (response (funcall route::private-routes request)))
       (matches '(200 nil (:|completed| t)) response))))
+
+(defun basic-authentication-header (username password)
+  (base64:string-to-base64-string
+   (format nil "~A:~A" username password)))
+
+(defun parse-session-cookie (response)
+  (a:when-let ((set-cookie-string (tiny:response-header response :set-cookie)))
+    (cl-cookie:parse-set-cookie-header set-cookie-string "" "")))
+
+(define-test csrf
+  :parent cl-natter
+  (with-fresh-database
+    (user:register-user "sampleuser1" "samplepassword1")
+    (let* ((request (mock-request :method :post :path "/login" :basic-auth (list "sampleuser1" "samplepassword1")))
+           (response (funcall route:app-routes request))
+           (session-cookie (cl-cookie:parse-set-cookie-header (tiny:response-header response :set-cookie) "" ""))
+           (body (jojo:parse (tiny:response-body response)))
+           (token-id (getf body :|token_id|)))
+      (is = 200 (tiny:response-status response))
+      (let ((request0 (mock-request :method :get :path "/spaces" :cookie session-cookie :csrf-token token-id))
+            (request1 (mock-request :method :get :path "/spaces" :cookie session-cookie))
+            (request2 (mock-request :method :get :path "/spaces" :csrf-token token-id)))
+        (matches '(200
+                   (:CONTENT-TYPE "application/json;charset=utf-8" :SERVER "cl-natter"
+                    :X-CONTENT-TYPE-OPTIONS "nosniff" :X-FRAME-OPTIONS "DENY" :X-XSS-PROTECTION
+                    "0" :CACHE-CONTROL "no-store" :PRAGMA "no-cache" :CONTENT-SECURITY-POLICY
+                    "default-src 'none'; frame-ancestors 'none'; sandbox")
+                   ("{\"spaces\":[]}"))
+                 (funcall route:app-routes request0))
+        (matches '(401
+                   (:CONTENT-TYPE "application/json;charset=utf-8" :WWW-AUTHENTICATE
+                    "Basic realm=\"/\", charset=\"UTF-8\"" :SERVER "cl-natter"
+                    :X-CONTENT-TYPE-OPTIONS "nosniff" :X-FRAME-OPTIONS "DENY" :X-XSS-PROTECTION
+                    "0" :CACHE-CONTROL "no-store" :PRAGMA "no-cache" :CONTENT-SECURITY-POLICY
+                    "default-src 'none'; frame-ancestors 'none'; sandbox")
+                   ("{\"error\":\"Unauthorized\"}"))
+                 (funcall route:app-routes request1))
+        (matches '(401
+                   (:CONTENT-TYPE "application/json;charset=utf-8" :WWW-AUTHENTICATE
+                    "Basic realm=\"/\", charset=\"UTF-8\"" :SERVER "cl-natter"
+                    :X-CONTENT-TYPE-OPTIONS "nosniff" :X-FRAME-OPTIONS "DENY" :X-XSS-PROTECTION
+                    "0" :CACHE-CONTROL "no-store" :PRAGMA "no-cache" :CONTENT-SECURITY-POLICY
+                    "default-src 'none'; frame-ancestors 'none'; sandbox")
+                   ("{\"error\":\"Unauthorized\"}"))
+                 (funcall route:app-routes request2))))))

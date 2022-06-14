@@ -127,7 +127,7 @@
          ;; catch all route
          (define-route ()
            (tiny:not-found "NOT_FOUND")))
-    (middleware:wrap-rate-limiter)
+    ;; (middleware:wrap-rate-limiter)
     (middleware:wrap-condition)
     (middleware:wrap-audit-log)
     (token:wrap-token-auth)

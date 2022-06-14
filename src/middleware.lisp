@@ -146,8 +146,10 @@
   (wrap-request-mapper
    handler
    (lambda (request)
+     (log:info :middleware "Attempting to parse session id from request")
      (let* ((sid (funcall session-id-parser request))
             (session (and sid (session:read-session* sid))))
+       (log:info :middleware "Found sid ~A" sid)
        (pipe request
          (request-append :session session)
          (request-append :session-id sid))))))
